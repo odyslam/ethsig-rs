@@ -1,6 +1,12 @@
 # Ethsig-rs
 
-Example worker that uses ethers-rs and cloudflare workers to create an endpoint that verifies signed messages with an Ethereum address.
+Example worker for ethereum-based applications.
+
+**Features**:
+- Verify arbitrary messages and their signature from an Ethereum Address
+- Verify [EIP-4361](https://eips.ethereum.org/EIPS/eip-4361)-based signature and message. This is used for the Sign-in-with-Ethereum (SIWE) standard.
+
+that uses ethers-rs and Cloudflare workers to create an endpoint that verifies signed messages with an Ethereum address.
 
 ## Usage
 
