@@ -1,4 +1,4 @@
-name = "ethsig-worker"
+name = "ethsig"
 type = "javascript"
 workers_dev = true
 compatibility_date = "2022-01-26"

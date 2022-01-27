@@ -1089,7 +1089,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ethsig-rs"
+name = "ethsig"
 version = "0.1.0"
 dependencies = [
  "cfg-if 0.1.10",

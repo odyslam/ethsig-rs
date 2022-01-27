@@ -1,5 +1,5 @@
 [package]
-name = "ethsig-rs"
+name = "ethsig"
 version = "0.1.0"
 authors = ["Odysseas Lamtzidis <odyslam@gmail.com>"]
 edition = "2018"
