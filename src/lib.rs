@@ -1,7 +1,11 @@
 use ethers::core::utils::to_checksum;
 use ethers::types::{Address, Signature};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 use worker::*;
 mod utils;
+use hex::FromHex;
+use siwe::Message;
 use std::str::FromStr;
 
 fn log_request(req: &Request) {
@@ -14,6 +18,12 @@ fn log_request(req: &Request) {
     );
 }
 
+#[derive(Deserialize, Serialize)]
+struct Authentication {
+    message: String,
+    signature: String,
+}
+
 #[event(fetch)]
 pub async fn main(req: Request, env: Env) -> Result<Response> {
     log_request(&req);
@@ -23,6 +33,29 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
         .get("/api/v0/info", |_, _ctx| {
             let version = "0.1";
             Response::ok(version)
+        })
+        .post_async("/authenticate", |mut req, _ctx| async move {
+            let body = match req.json::<Authentication>().await {
+                Ok(json) => json,
+                Err(error) => return Response::error(format!("Body Parsing:{:?}", error), 500),
+            };
+            let signature = match <[u8; 65]>::from_hex(body.signature) {
+                Ok(sig) => sig,
+                Err(error) => {
+                    return Response::error(format!("Signature Parsing: {:?}", error), 500)
+                }
+            };
+            let message: Message = match body.message.parse() {
+                Ok(msg) => msg,
+                Err(error) => return Response::error(format!("Message Parsing:{:?}", error), 500),
+            };
+            match message.verify(signature) {
+                Ok(signer) => return Response::from_json(&json!({ "status": signer })),
+                Err(error) => {
+                    return Response::from_json(&json!(
+                        {"verified": false, "error" : format!("{:?}", error) }))
+                }
+            }
         })
         .get(
             "/api/v0/address/:address/signature/:signature/message/:message",

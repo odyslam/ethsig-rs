@@ -14,6 +14,11 @@ default = ["console_error_panic_hook"]
 cfg-if = "0.1.2"
 ethers =  { git = "https://github.com/odyslam/ethers-rs" , branch = "fix/worker-compile", default-features = false }
 worker = "0.0.7"
+siwe = { git = "https://github.com/spruceid/siwe-rs" }
+hex = "0.4"
+serde_json = "1.0.67"
+serde = { version = "1.0", features = ["derive"] }
+
 
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
