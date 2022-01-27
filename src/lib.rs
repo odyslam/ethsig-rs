@@ -1,11 +1,11 @@
 use ethers::core::utils::to_checksum;
-use ethers::types::{Address, Signature};
+use ethers::types::{Address, Signature, H160};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use worker::*;
 mod utils;
 use hex::FromHex;
-use siwe::Message;
+use siwe::{Message, TimeStamp};
 use std::str::FromStr;
 
 fn log_request(req: &Request) {
@@ -19,9 +19,17 @@ fn log_request(req: &Request) {
 }
 
 #[derive(Deserialize, Serialize)]
-struct Authentication {
+struct AuthRequest {
     message: String,
     signature: String,
+}
+
+#[derive(Deserialize, Serialize)]
+struct Authorization {
+    resources: Vec<String>,
+    issued_at: String,
+    expiration_time: Option<String>,
+    not_before: Option<String>,
 }
 
 #[event(fetch)]
@@ -34,8 +42,8 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
             let version = "0.1";
             Response::ok(version)
         })
-        .post_async("/authenticate", |mut req, _ctx| async move {
-            let body = match req.json::<Authentication>().await {
+        .post_async("/authorize", |mut req, ctx| async move {
+            let body = match req.json::<AuthRequest>().await {
                 Ok(json) => json,
                 Err(error) => return Response::error(format!("Body Parsing:{:?}", error), 500),
             };
@@ -50,7 +58,25 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
                 Err(error) => return Response::error(format!("Message Parsing:{:?}", error), 500),
             };
             match message.verify(signature) {
-                Ok(signer) => return Response::from_json(&json!({ "status": signer })),
+                Ok(signer) => {
+                    let authentication = ctx.kv("AUTHENTICATION")?;
+                    let auth = Authorization {
+                        resources: message
+                            .resources
+                            .iter()
+                            .map(|x| x.as_str().to_owned())
+                            .collect::<Vec<String>>(),
+                        issued_at: format!("{}", message.issued_at),
+                        expiration_time: message.expiration_time.map(|x| format!("{}", x)),
+                        not_before: message.not_before.map(|x| format!("{}", x)),
+                    };
+                    let auth_string: String = serde_json::to_string(&auth).unwrap();
+                    authentication
+                        .put(&to_checksum(&H160(message.address), Some(1)), auth_string)?
+                        .execute()
+                        .await?;
+                    return Response::ok("authenticated");
+                }
                 Err(error) => {
                     return Response::from_json(&json!(
                         {"verified": false, "error" : format!("{:?}", error) }))

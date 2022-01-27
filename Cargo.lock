@@ -1096,6 +1096,7 @@ dependencies = [
  "console_error_panic_hook",
  "ethers",
  "hex",
+ "iri-string",
  "serde",
  "serde_json",
  "siwe",
