@@ -5,6 +5,8 @@ use serde_json::json;
 use worker::*;
 mod utils;
 use hex::FromHex;
+use rand::Rng;
+use sha2::{Digest, Sha256};
 use siwe::{Message, TimeStamp};
 use std::str::FromStr;
 
@@ -33,7 +35,7 @@ struct Authorization {
 }
 
 #[event(fetch)]
-pub async fn main(req: Request, env: Env) -> Result<Response> {
+pub async fn main(req: Request, env: Env, ctx: worker::Context) -> Result<Response> {
     log_request(&req);
     utils::set_panic_hook();
     let router = Router::new();
@@ -58,8 +60,10 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
                 Err(error) => return Response::error(format!("Message Parsing:{:?}", error), 500),
             };
             match message.verify(signature) {
-                Ok(signer) => {
+                Ok(_) => {
                     let authentication = ctx.kv("AUTHENTICATION")?;
+                    let mut rng = rand::thread_rng();
+                    let mut hasher = Sha256::new();
                     let auth = Authorization {
                         resources: message
                             .resources
@@ -67,15 +71,50 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
                             .map(|x| x.as_str().to_owned())
                             .collect::<Vec<String>>(),
                         issued_at: format!("{}", message.issued_at),
-                        expiration_time: message.expiration_time.map(|x| format!("{}", x)),
+                        expiration_time: message.expiration_time.clone().map(|x| format!("{}", x)),
                         not_before: message.not_before.map(|x| format!("{}", x)),
                     };
                     let auth_string: String = serde_json::to_string(&auth).unwrap();
+                    hasher.update(auth_string.as_bytes());
+                    hasher.update(rng.gen::<[u8; 32]>());
+                    let hash = format!("{:X}", hasher.finalize());
                     authentication
-                        .put(&to_checksum(&H160(message.address), Some(1)), auth_string)?
+                        .put(&hash, &auth_string)?
+                        .expiration(
+                            message
+                                .expiration_time
+                                .unwrap()
+                                .as_ref()
+                                .timestamp()
+                                .unsigned_abs(),
+                        )
                         .execute()
                         .await?;
-                    return Response::ok("authenticated");
+                    let mut headers = Headers::new();
+                    console_log!(
+                        r#"
+new user created!
+user: {}
+key: {}
+value: {}
+"#,
+                        to_checksum(&H160(message.address), Some(0)),
+                        &hash,
+                        &auth_string
+                    );
+                    headers.set(
+                        "Set-cookie",
+                        &format!(
+                            "SIWE-AUTH={}; Secure; HttpOnly; SameSite=Lax; Expires={}",
+                            &hash,
+                            Date::now().to_string()
+                        ),
+                    )?;
+                    let res =
+                        Response::redirect(worker::Url::from_str("http:/localhost/").unwrap())
+                            .unwrap()
+                            .with_headers(headers);
+                    return Ok(res);
                 }
                 Err(error) => {
                     return Response::from_json(&json!(
