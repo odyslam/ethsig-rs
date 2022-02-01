@@ -2,6 +2,9 @@ name = "ethsig"
 type = "javascript"
 workers_dev = true
 compatibility_date = "2022-01-26"
+kv_namespaces = [
+         { binding = "AUTHENTICATION", preview_id = "671d647da83f4e6f8c0ab54c5d3667ae", id = "b086e622446b48ac8a70a35014c35620" }
+]
 
 [vars]
 WORKERS_RS_VERSION = "0.0.7"
@@ -18,5 +21,4 @@ main   = "./shim.mjs"
 globs = ["**/*.wasm"]
 type  = "CompiledWasm"
 
-# read more about configuring your Worker via wrangler.toml at:
-# https://developers.cloudflare.com/workers/cli-wrangler/configuration
+
