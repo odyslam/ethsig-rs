@@ -34,6 +34,18 @@ struct Authorization {
     not_before: Option<String>,
 }
 
+async fn is_authorized(req: worker::Request, ctx: worker::Context) -> Result<Authorization> {
+    let headers = req.headers();
+    let bearer = headers.get("BEARER")?;
+    let cookie = headers.get("AUTH-SIWE")?;
+    let auth = match bearer.or(cookie)
+        Some(token) => token,
+        None => return 
+    let store = ctx.kv("AUTHENTICATION");
+    let authorization = store.get(auth)?;
+    Ok(())
+}
+
 #[event(fetch)]
 pub async fn main(req: Request, env: Env, ctx: worker::Context) -> Result<Response> {
     log_request(&req);
