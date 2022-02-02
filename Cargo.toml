@@ -22,7 +22,7 @@ iri-string = "0.4"
 anyhow = "1.0"
 sha2 = "0.10"
 rand = "0.8.4"
-
+thiserror = "1.0"
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
