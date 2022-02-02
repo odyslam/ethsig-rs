@@ -13,7 +13,7 @@ default = ["console_error_panic_hook"]
 [dependencies]
 cfg-if = "0.1.2"
 ethers =  { git = "https://github.com/odyslam/ethers-rs" , branch = "fix/worker-compile", default-features = false }
-worker = "0.0.8"
+worker =  { git = "https://github.com/cloudflare/workers-rs" , rev = "355f270d249c47399e82876fd597a74e558f8db6" }
 siwe = { git = "https://github.com/spruceid/siwe-rs" }
 hex = "0.4"
 serde_json = "1.0.67"
