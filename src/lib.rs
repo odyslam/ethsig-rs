@@ -2,12 +2,13 @@ use ethers::core::utils::to_checksum;
 use ethers::types::{Address, Signature, H160};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use worker::Response;
 use worker::*;
 mod utils;
 use hex::FromHex;
 use rand::Rng;
 use sha2::{Digest, Sha256};
-use siwe::{Message, TimeStamp};
+use siwe::Message;
 use std::str::FromStr;
 
 fn log_request(req: &Request) {
@@ -34,19 +35,23 @@ struct Authorization {
     not_before: Option<String>,
 }
 
-async fn is_authorized(req: worker::Request, ctx: worker::Context) -> Result<Authorization> {
-    let headers = req.headers();
-    let bearer = headers.get("BEARER")?;
-    let cookie = headers.get("AUTH-SIWE")?;
-    let auth = match bearer.or(cookie)
-        Some(token) => token,
-        None => return 
-    let store = ctx.kv("AUTHENTICATION");
-    let authorization = store.get(auth)?;
-    Ok(())
-}
+// async fn is_authorized(
+//     req: worker::Request,
+//     ctx: worker::Context,
+// ) -> worker::Result<Authorization> {
+//     let headers = req.headers();
+//     let bearer = headers.get("BEARER")?;
+//     let cookie = headers.get("AUTH-SIWE")?;
+//     let auth = match bearer.or(cookie) {
+//         Some(token) => token,
+//         None => return,
+//     };
+//     let store = ctx.kv("AUTHENTICATION");
+//     let authorization = store.get(auth)?;
+//     Ok(())
+// }
 
-#[event(fetch)]
+#[event(fetch, respond_with_errors)]
 pub async fn main(req: Request, env: Env, ctx: worker::Context) -> Result<Response> {
     log_request(&req);
     utils::set_panic_hook();
@@ -57,20 +62,15 @@ pub async fn main(req: Request, env: Env, ctx: worker::Context) -> Result<Respon
             Response::ok(version)
         })
         .post_async("/authorize", |mut req, ctx| async move {
-            let body = match req.json::<AuthRequest>().await {
-                Ok(json) => json,
-                Err(error) => return Response::error(format!("Body Parsing:{:?}", error), 500),
-            };
-            let signature = match <[u8; 65]>::from_hex(body.signature) {
-                Ok(sig) => sig,
-                Err(error) => {
-                    return Response::error(format!("Signature Parsing: {:?}", error), 500)
-                }
-            };
-            let message: Message = match body.message.parse() {
-                Ok(msg) => msg,
-                Err(error) => return Response::error(format!("Message Parsing:{:?}", error), 500),
-            };
+            let body = req
+                .json::<AuthRequest>()
+                .await
+                .map_err(|error| worker::Error::from(format!("body parsing: {:?}", error)))?;
+            let signature = <[u8; 65]>::from_hex(body.signature)
+                .map_err(|error| worker::Error::from(format!("signature parsing: {:?}", error)))?;
+            let message: Message = body.message.parse().map_err(|error| {
+                worker::Error::from(format!("siwe message parsing: {:?}", error))
+            })?;
             match message.verify(signature) {
                 Ok(_) => {
                     let authentication = ctx.kv("AUTHENTICATION")?;
@@ -105,10 +105,12 @@ pub async fn main(req: Request, env: Env, ctx: worker::Context) -> Result<Respon
                     let mut headers = Headers::new();
                     console_log!(
                         r#"
-new user created!
+########
+New session:
 user: {}
 key: {}
 value: {}
+########
 "#,
                         to_checksum(&H160(message.address), Some(0)),
                         &hash,
