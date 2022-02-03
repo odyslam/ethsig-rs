@@ -34,6 +34,7 @@ struct Authorization {
     issued_at: String,
     expiration_time: Option<String>,
     not_before: Option<String>,
+    address: H160,
 }
 
 impl Authorization {
@@ -55,8 +56,8 @@ impl Authorization {
             .await
             .map_err(|error| worker::Error::from(error))
     }
-    async fn check_route(ctx: worker::RouteContext<()>, req: Request) -> Result<bool> {
-        match Authorization::from_req(&ctx, &req).await? {
+    async fn check_route(ctx: &worker::RouteContext<()>, req: &Request) -> Result<bool> {
+        match Authorization::from_req(ctx, req).await? {
             Some(auth) => Ok(auth.resources.contains(&req.url()?.to_string())),
             None => Err(worker::Error::from("could not find auth object")),
         }
@@ -72,6 +73,13 @@ pub async fn main(req: Request, worker_env: Env, worker_ctx: Context) -> Result<
         .get("/api/v0/info", |_, _ctx| {
             let version = "0.1";
             Response::ok(version)
+        })
+        .get_async("address/:address", |req, ctx| async move {
+            if Authorization::check_route(&ctx, &req).await? {
+                Response::ok("authorized!")
+            } else {
+                Response::error("not authorized", 401)
+            }
         })
         .post_async("/authorize", |mut req, ctx| async move {
             let body = req
@@ -97,6 +105,7 @@ pub async fn main(req: Request, worker_env: Env, worker_ctx: Context) -> Result<
                         issued_at: format!("{}", message.issued_at),
                         expiration_time: message.expiration_time.clone().map(|x| format!("{}", x)),
                         not_before: message.not_before.map(|x| format!("{}", x)),
+                        address: H160(message.address),
                     };
                     let auth_string: String = serde_json::to_string(&auth).unwrap();
                     hasher.update(auth_string.as_bytes());
