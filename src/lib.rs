@@ -10,6 +10,7 @@ use rand::Rng;
 use sha2::{Digest, Sha256};
 use siwe::Message;
 use std::str::FromStr;
+use worker::wasm_bindgen::UnwrapThrowExt;
 
 fn log_request(req: &Request) {
     console_log!(
@@ -35,24 +36,35 @@ struct Authorization {
     not_before: Option<String>,
 }
 
-// async fn is_authorized(
-//     req: worker::Request,
-//     ctx: worker::Context,
-// ) -> worker::Result<Authorization> {
-//     let headers = req.headers();
-//     let bearer = headers.get("BEARER")?;
-//     let cookie = headers.get("AUTH-SIWE")?;
-//     let auth = match bearer.or(cookie) {
-//         Some(token) => token,
-//         None => return,
-//     };
-//     let store = ctx.kv("AUTHENTICATION");
-//     let authorization = store.get(auth)?;
-//     Ok(())
-// }
+impl Authorization {
+    async fn from_req(
+        ctx: &worker::RouteContext<()>,
+        req: &Request,
+    ) -> Result<Option<Authorization>> {
+        let headers = req.headers();
+        let bearer = headers.get("BEARER")?;
+        let cookie = headers.get("AUTH-SIWE")?;
+        let token = match bearer.or(cookie) {
+            Some(token) => token,
+            None => return Err(worker::Error::from("no authorization header found")),
+        };
+        let store = ctx.kv("AUTHENTICATION")?;
+        store
+            .get(&token)
+            .json::<Authorization>()
+            .await
+            .map_err(|error| worker::Error::from(error))
+    }
+    async fn check_route(ctx: worker::RouteContext<()>, req: Request) -> Result<bool> {
+        match Authorization::from_req(&ctx, &req).await? {
+            Some(auth) => Ok(auth.resources.contains(&req.url()?.to_string())),
+            None => Err(worker::Error::from("could not find auth object")),
+        }
+    }
+}
 
 #[event(fetch, respond_with_errors)]
-pub async fn main(req: Request, env: Env, ctx: worker::Context) -> Result<Response> {
+pub async fn main(req: Request, worker_env: Env, worker_ctx: Context) -> Result<Response> {
     log_request(&req);
     utils::set_panic_hook();
     let router = Router::new();
@@ -88,8 +100,12 @@ pub async fn main(req: Request, env: Env, ctx: worker::Context) -> Result<Respon
                     };
                     let auth_string: String = serde_json::to_string(&auth).unwrap();
                     hasher.update(auth_string.as_bytes());
+                    // add salt to the auth token
                     hasher.update(rng.gen::<[u8; 32]>());
                     let hash = format!("{:X}", hasher.finalize());
+                    // store the auth object of a user with the auth token as key
+                    // the auth object KV will expire when then SIWE message expires as well.
+                    // That way, we don't have stale auth objects in our KV store
                     authentication
                         .put(&hash, &auth_string)?
                         .expiration(
@@ -173,6 +189,6 @@ Verified: {:?}
                 }
             },
         )
-        .run(req, env)
+        .run(req, worker_env)
         .await
 }
