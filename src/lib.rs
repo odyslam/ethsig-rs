@@ -10,7 +10,6 @@ use rand::Rng;
 use sha2::{Digest, Sha256};
 use siwe::Message;
 use std::str::FromStr;
-use worker::wasm_bindgen::UnwrapThrowExt;
 
 fn log_request(req: &Request) {
     console_log!(
@@ -38,10 +37,7 @@ struct Authorization {
 }
 
 impl Authorization {
-    async fn from_req(
-        ctx: &worker::RouteContext<()>,
-        req: &Request,
-    ) -> Result<Option<Authorization>> {
+    async fn from_req(env: &Env, req: &Request) -> Result<Option<Authorization>> {
         let headers = req.headers();
         let bearer = headers.get("BEARER")?;
         let cookie = headers.get("AUTH-SIWE")?;
@@ -49,44 +45,39 @@ impl Authorization {
             Some(token) => token,
             None => return Err(worker::Error::from("no authorization header found")),
         };
-        let store = ctx.kv("AUTHENTICATION")?;
+        let store = env.kv("AUTHENTICATION")?;
         store
             .get(&token)
             .json::<Authorization>()
             .await
             .map_err(|error| worker::Error::from(error))
     }
-    async fn check_route(ctx: &worker::RouteContext<()>, req: &Request) -> Result<bool> {
-        match Authorization::from_req(ctx, req).await? {
-            Some(auth) => Ok(auth.resources.contains(&req.url()?.to_string())),
+    async fn is_authorized(env: &Env, req: &Request) -> Result<bool> {
+        match Authorization::from_req(env, req).await? {
+            Some(auth) => Ok(auth.resources.contains(&req.url()?.path().to_string())),
             None => Err(worker::Error::from("could not find auth object")),
         }
     }
 }
 
 #[event(fetch, respond_with_errors)]
-pub async fn main(req: Request, worker_env: Env, worker_ctx: Context) -> Result<Response> {
+pub async fn main(req: Request, env: Env, worker_ctx: Context) -> Result<Response> {
     log_request(&req);
     utils::set_panic_hook();
+    let authorized: bool = Authorization::is_authorized(&env, &req).await?;
     let router = Router::new();
     router
-        .get("/api/v0/info", |_, _ctx| {
+        .get("/api/v0/info", |req, _ctx| {
             let version = "0.1";
+            console_log!("{}", req.url()?.path());
             Response::ok(version)
-        })
-        .get_async("address/:address", |req, ctx| async move {
-            if Authorization::check_route(&ctx, &req).await? {
-                Response::ok("authorized!")
-            } else {
-                Response::error("not authorized", 401)
-            }
         })
         .post_async("/authorize", |mut req, ctx| async move {
             let body = req
                 .json::<AuthRequest>()
                 .await
                 .map_err(|error| worker::Error::from(format!("body parsing: {:?}", error)))?;
-            let signature = <[u8; 65]>::from_hex(body.signature)
+            let signature = <[u8; 65]>::from_hex(body.signature.trim_start_matches("0x"))
                 .map_err(|error| worker::Error::from(format!("signature parsing: {:?}", error)))?;
             let message: Message = body.message.parse().map_err(|error| {
                 worker::Error::from(format!("siwe message parsing: {:?}", error))
