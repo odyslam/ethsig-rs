@@ -1,12 +1,14 @@
 # Ethsig-rs
 
-Example worker for ethereum-based applications.
+A Cloudflare worker that enables any backend service to use Sign In With Ethereum (SIWE) as an authetnication method.
 
-**Features**:
-- Verify arbitrary messages and their signature from an Ethereum Address
-- Verify [EIP-4361](https://eips.ethereum.org/EIPS/eip-4361)-based signature and message. This is used for the Sign-in-with-Ethereum (SIWE) standard.
+The worker is an implementation of the SIWE standard to authorize users based on their Ethereum accounts.
 
-that uses ethers-rs and Cloudflare workers to create an endpoint that verifies signed messages with an Ethereum address.
+The cloudflare worker supports an endpoint called `/authorize`, which is called for a user to sign-in or sign-up. The worker creates salts the authorization request and creates a token for the user to use when making authorized API calls. The token is also the key in a simple KV store that is used by a worker to retrieve authorization information about the user.
+
+We leverage the worker's ability to auto-expire keys, which we set to last up to the point where the SIWE message expires. That way we can be certain that if a key exists in the KV Store, it must be valid still.Moreover, we don't have to deal with stale authorizations.
+
+This worker is developped to power a new set of tools for compensating contributors in DAOs.
 
 ## Usage
 
