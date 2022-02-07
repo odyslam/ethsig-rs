@@ -152,43 +152,6 @@ value: {}
                 }
             }
         })
-        .get(
-            "/api/v0/address/:address/signature/:signature/message/:message",
-            |_req, ctx| {
-                let message = ctx.param("message").unwrap();
-                let signature = Signature::from_str(&ctx.param("signature").unwrap());
-                match signature {
-                    Ok(sig) => {
-                        let address: Address = match ctx.param("address").unwrap().parse() {
-                            Ok(addr) => addr,
-                            Err(_error) => {
-                                return Response::error("Could not parse address", 500);
-                            }
-                        };
-                        let address_ascii = ethers::core::utils::to_checksum(&address, None);
-                        let res = format!(
-                            r#"
-Signature: {:?}
-Message: {}
-Address: {}
-Verified: {:?}
-                        "#,
-                            signature,
-                            message,
-                            address_ascii,
-                            sig.verify(message.clone(), address)
-                        );
-                        return Response::ok(res);
-                    }
-                    Err(error) => {
-                        return Response::error(
-                            format!("Could not parse signature. Error: {}", error),
-                            500,
-                        );
-                    }
-                }
-            },
-        )
         .run(req, worker_env)
         .await
 }
