@@ -12,7 +12,7 @@ fn log_request(req: &Request) {
         Date::now().to_string(),
         req.path(),
         req.cf().coordinates().unwrap_or_default(),
-        req.cf().region().unwrap_or("unknown region".into())
+        req.cf().region().unwrap_or_else(|| "unknown region".into())
     );
 }
 
@@ -119,7 +119,7 @@ async fn is_authorized(req: &Request, env: &Env, ctx: &RouteContext<()>) -> Resu
 ///
 ///
 #[event(fetch, respond_with_errors)]
-pub async fn main(req: Request, env: Env, worker_ctx: Context) -> Result<Response> {
+pub async fn main(req: Request, env: Env, _worker_ctx: Context) -> Result<Response> {
     log_request(&req);
     utils::set_panic_hook();
     let router = Router::new();
