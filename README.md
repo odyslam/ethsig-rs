@@ -34,8 +34,8 @@ Read the latest `worker` crate documentation here: https://docs.rs/worker
 
 ## Linting
 
-``
-`cargo check --all
+```bash
+cargo check --all
 cargo +nightly fmt -- --check
 cargo +nightly clippy --all --all-features -- -D warnings
 ```
