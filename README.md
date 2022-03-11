@@ -12,7 +12,7 @@ The example assumes that it's used by some front-end as the authentication logic
 
 We leverage the worker's ability to auto-expire keys, which we set to last up to the point where the SIWE message expires. That way we can be certain that if a key exists in the KV Store, it must be valid still.Moreover, we don't have to deal with stale authorizations.
 
-This worker is developer to power a new set of tools for compensating contributors in DAOs.
+Ethsig was developed to be used in a product of the [Radicle](https://radicle.xyz) stack.
 
 ## Usage
 
