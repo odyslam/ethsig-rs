@@ -1,5 +1,5 @@
 [package]
-name = "ethsig"
+name = "ethsig-rs"
 version = "0.1.0"
 authors = ["Odysseas Lamtzidis <odyslam@gmail.com>"]
 edition = "2018"
@@ -13,13 +13,16 @@ default = ["console_error_panic_hook"]
 [dependencies]
 cfg-if = "0.1.2"
 ethers =  { git = "https://github.com/odyslam/ethers-rs" , branch = "fix/worker-compile", default-features = false }
-worker = "0.0.7"
+worker =  { git = "https://github.com/cloudflare/workers-rs" }
 siwe = { git = "https://github.com/spruceid/siwe-rs" }
 hex = "0.4"
 serde_json = "1.0.67"
 serde = { version = "1.0", features = ["derive"] }
-
-
+iri-string = "0.4"
+anyhow = "1.0"
+sha2 = "0.10"
+rand = "0.8.4"
+thiserror = "1.0"
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
