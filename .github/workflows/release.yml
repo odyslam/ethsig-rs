@@ -1,0 +1,28 @@
+on:
+  push:
+    branches:
+      - master
+
+name: Release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+
+      - uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
+
+      - name: Publish
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: npm i @cloudflare/wrangler && npx wrangler publish

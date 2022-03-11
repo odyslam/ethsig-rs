@@ -31,6 +31,23 @@ wrangler publish
 
 Read the latest `worker` crate documentation here: https://docs.rs/worker
 
+
+## Linting
+
+``
+`cargo check --all
+cargo +nightly fmt -- --check
+cargo +nightly clippy --all --all-features -- -D warnings
+```
+
+## CI
+
+The repository will automatically Lint and build the `rustdoc` for this worker on every new PR. The `rustdocs` are placed in `/docs`, so they can be automatically hosted in GitHub pages.
+
+Make sure you change the link inside `gen-docs.sh` to the name of the crate. This redirection is required because GitHub pages will only serve `/docs/index.html` as the entrypoint. With the redirection, we point the user to the correct subpath where the `rustdoc` `index.html` exists.
+
+The repository will auto-publish the worker on every new commit to `master`. Make sure you add `CF_API_TOKEN` to the secrets of the repo.
+
 ## WebAssembly
 
 `workers-rs` (the Rust SDK for Cloudflare Workers used in this template) is meant to be executed as
